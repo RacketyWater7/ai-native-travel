@@ -1,4 +1,5 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const SERVER_API_URL = process.env.API_INTERNAL_URL ?? API_URL;
 
 export type PropertyCard = {
   id: number;
@@ -32,10 +33,18 @@ export type SearchResponse = {
   weights: Record<string, number>;
 };
 
-export async function searchProperties(params: Record<string, string | number | boolean | undefined>) {
+export async function searchProperties(
+  params: Record<string, string | number | boolean | string[] | undefined>
+) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== "") query.set(key, String(value));
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item) query.append(key, item);
+      });
+    } else if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
   });
   const response = await fetch(`${API_URL}/api/search?${query.toString()}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Search failed");

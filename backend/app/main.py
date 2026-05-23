@@ -101,7 +101,10 @@ async def wishlist(payload: dict, conn: Annotated[AsyncConnection, Depends(get_c
 @app.get("/api/compare")
 async def compare(ids: str, conn: Annotated[AsyncConnection, Depends(get_conn)]):
     id_list = [int(item) for item in ids.split(",") if item.strip()]
-    result = await conn.execute(text("SELECT * FROM properties WHERE id = ANY(:ids)"), {"ids": id_list})
+    result = await conn.execute(
+        text("SELECT * FROM properties WHERE id = ANY(CAST(:ids AS bigint[]))"),
+        {"ids": id_list},
+    )
     items = [dict(row) for row in result.mappings().all()]
     verdict = "Best value is the lowest price among similarly rated stays; review consistency uses stored aspect sentiment."
     return {"items": items, "ai_verdict": verdict}
@@ -146,6 +149,9 @@ async def batch_compare(payload: dict, conn: Annotated[AsyncConnection, Depends(
     groups = payload.get("groups", [])
     out = []
     for ids in groups[:10]:
-        result = await conn.execute(text("SELECT id, name, rating_overall FROM properties WHERE id = ANY(:ids)"), {"ids": ids})
+        result = await conn.execute(
+            text("SELECT id, name, rating_overall FROM properties WHERE id = ANY(CAST(:ids AS bigint[]))"),
+            {"ids": ids},
+        )
         out.append({"ids": ids, "items": [dict(row) for row in result.mappings().all()]})
     return {"groups": out}

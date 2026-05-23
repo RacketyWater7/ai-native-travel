@@ -1,9 +1,16 @@
-import { API_URL } from "@/lib/api";
+import { SERVER_API_URL } from "@/lib/api";
 
 export default async function ComparePage({ searchParams }: { searchParams: { ids?: string } }) {
   const ids = searchParams.ids ?? "";
-  const response = ids ? await fetch(`${API_URL}/api/compare?ids=${ids}`, { cache: "no-store" }) : null;
-  const data = response?.ok ? await response.json() : { items: [], ai_verdict: "Pick 2-4 listings to compare." };
+  let data = { items: [], ai_verdict: "Pick 2-4 listings to compare." };
+  if (ids) {
+    try {
+      const response = await fetch(`${SERVER_API_URL}/api/compare?ids=${ids}`, { cache: "no-store" });
+      if (response.ok) data = await response.json();
+    } catch {
+      data = { items: [], ai_verdict: "The API is not reachable from the frontend server right now." };
+    }
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">

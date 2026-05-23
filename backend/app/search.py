@@ -37,6 +37,12 @@ async def search_properties(conn: AsyncConnection, params: SearchParams) -> Sear
     if params.city:
         where.append("lower(city) = lower(:city)")
         values["city"] = params.city
+    guest_count = max((params.adults or 0) + (params.children or 0), 1)
+    where.append("(accommodates IS NULL OR accommodates >= :guest_count)")
+    values["guest_count"] = guest_count
+    if params.rooms and params.rooms > 1:
+        where.append("(bedrooms IS NULL OR bedrooms >= :rooms)")
+        values["rooms"] = params.rooms
     if params.min_price is not None:
         where.append("price_per_night >= :min_price")
         values["min_price"] = params.min_price

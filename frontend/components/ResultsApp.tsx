@@ -5,9 +5,20 @@ import { API_URL, PropertyCard as Property, searchProperties } from "@/lib/api";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Concierge } from "@/components/Concierge";
 
+const AMENITIES = ["wifi", "kitchen", "washer", "balcony", "river_view", "free_parking", "gym"];
+
 export function ResultsApp() {
   const [city, setCity] = useState("London");
+  const [checkIn, setCheckIn] = useState("2026-06-24");
+  const [checkOut, setCheckOut] = useState("2026-06-27");
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [rooms, setRooms] = useState(1);
   const [maxPrice, setMaxPrice] = useState("180");
+  const [minRating, setMinRating] = useState("4.3");
+  const [roomType, setRoomType] = useState("");
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [sort, setSort] = useState("rating");
   const [nearTransit, setNearTransit] = useState(true);
   const [nl, setNl] = useState("a quiet 1-bed in Lisbon under €130 with a balcony for late June");
   const [items, setItems] = useState<Property[]>([]);
@@ -16,13 +27,40 @@ export function ResultsApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const chips = useMemo(() => [`city: ${city}`, `max price: ${maxPrice}`, nearTransit ? "near transit" : "any transit"], [city, maxPrice, nearTransit]);
+  const chips = useMemo(
+    () => [
+      `city: ${city}`,
+      `${checkIn} to ${checkOut}`,
+      `${adults + children} guests`,
+      `${rooms} room${rooms === 1 ? "" : "s"}`,
+      `max price: ${maxPrice}`,
+      `rating: ${minRating}+`,
+      roomType ? `type: ${roomType}` : "any property type",
+      nearTransit ? "near transit" : "any transit",
+      ...amenities.map((amenity) => amenity.replaceAll("_", " "))
+    ],
+    [adults, amenities, checkIn, checkOut, children, city, maxPrice, minRating, nearTransit, roomType, rooms]
+  );
 
   async function runSearch() {
     setLoading(true);
     setError(null);
     try {
-      const data = await searchProperties({ city, max_price: maxPrice, near_transit: nearTransit, page_size: 12 });
+      const data = await searchProperties({
+        city,
+        check_in: checkIn,
+        check_out: checkOut,
+        adults,
+        children,
+        rooms,
+        max_price: maxPrice,
+        min_rating: minRating,
+        room_type: roomType,
+        amenities,
+        near_transit: nearTransit,
+        sort,
+        page_size: 12
+      });
       setItems(data.items);
       setTotal(data.total);
     } catch (err) {
@@ -42,7 +80,16 @@ export function ResultsApp() {
     });
     const intent = await response.json();
     if (intent.city) setCity(intent.city);
+    if (intent.check_in) setCheckIn(intent.check_in);
+    if (intent.check_out) setCheckOut(intent.check_out);
+    if (intent.adults) setAdults(intent.adults);
+    if (intent.children !== undefined) setChildren(intent.children);
+    if (intent.rooms) setRooms(intent.rooms);
     if (intent.budget_per_night) setMaxPrice(String(intent.budget_per_night));
+    if (intent.hard_constraints?.room_type) setRoomType(intent.hard_constraints.room_type);
+    if (intent.soft_preferences?.balcony && !amenities.includes("balcony")) {
+      setAmenities((current) => Array.from(new Set([...current, "balcony"])));
+    }
     if (intent.hard_constraints?.near_transit !== undefined) {
       setNearTransit(Boolean(intent.hard_constraints.near_transit));
     }
@@ -50,7 +97,13 @@ export function ResultsApp() {
 
   useEffect(() => {
     runSearch().catch(() => setItems([]));
-  }, [city, maxPrice, nearTransit]);
+  }, [adults, amenities, checkIn, checkOut, children, city, maxPrice, minRating, nearTransit, roomType, rooms, sort]);
+
+  function toggleAmenity(amenity: string) {
+    setAmenities((current) =>
+      current.includes(amenity) ? current.filter((item) => item !== amenity) : [...current, amenity]
+    );
+  }
 
   return (
     <main className="min-h-screen px-6 py-6">
@@ -61,7 +114,7 @@ export function ResultsApp() {
           <p className="mt-3 max-w-2xl text-white/70">Search Lisbon and London stays, edit filter chips, inspect maps and reviews, save comparisons, and stream grounded agent steps.</p>
         </div>
 
-        <div className="card mb-6 grid gap-4 p-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="card mb-6 grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <label className="text-xs font-bold uppercase text-black/50">Natural language search</label>
             <div className="mt-2 flex gap-2">
@@ -70,10 +123,32 @@ export function ResultsApp() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{chips.map((chip) => <span className="chip" key={chip}>{chip}</span>)}</div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <label className="text-sm">City<select className="mt-1 w-full rounded-2xl border p-2" value={city} onChange={(event) => setCity(event.target.value)}><option>London</option><option>Lisbon</option></select></label>
-            <label className="text-sm">Max price<input className="mt-1 w-full rounded-2xl border p-2" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+            <label className="text-sm">Check-in<input type="date" className="mt-1 w-full rounded-2xl border p-2" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
+            <label className="text-sm">Check-out<input type="date" className="mt-1 w-full rounded-2xl border p-2" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
+            <label className="text-sm">Max price<input type="range" min="40" max="300" className="mt-3 w-full" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /><span className="text-xs">{maxPrice}</span></label>
+            <label className="text-sm">Adults<input type="number" min="1" className="mt-1 w-full rounded-2xl border p-2" value={adults} onChange={(event) => setAdults(Number(event.target.value))} /></label>
+            <label className="text-sm">Children<input type="number" min="0" className="mt-1 w-full rounded-2xl border p-2" value={children} onChange={(event) => setChildren(Number(event.target.value))} /></label>
+            <label className="text-sm">Rooms<input type="number" min="1" className="mt-1 w-full rounded-2xl border p-2" value={rooms} onChange={(event) => setRooms(Number(event.target.value))} /></label>
+            <label className="text-sm">Rating<select className="mt-1 w-full rounded-2xl border p-2" value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="">Any</option><option value="4">4.0+</option><option value="4.3">4.3+</option><option value="4.6">4.6+</option></select></label>
+            <label className="text-sm">Property type<select className="mt-1 w-full rounded-2xl border p-2" value={roomType} onChange={(event) => setRoomType(event.target.value)}><option value="">Any</option><option>Entire home/apt</option><option>Private room</option></select></label>
+            <label className="text-sm">Sort<select className="mt-1 w-full rounded-2xl border p-2" value={sort} onChange={(event) => setSort(event.target.value)}><option value="rating">Rating</option><option value="price_asc">Price low-to-high</option><option value="popularity">Popularity</option></select></label>
             <label className="flex items-end gap-2 text-sm"><input type="checkbox" checked={nearTransit} onChange={(event) => setNearTransit(event.target.checked)} /> Near transit</label>
+          </div>
+          <div className="lg:col-span-2">
+            <div className="mb-2 text-xs font-bold uppercase text-black/50">Amenities</div>
+            <div className="flex flex-wrap gap-2">
+              {AMENITIES.map((amenity) => (
+                <button
+                  key={amenity}
+                  className={`chip ${amenities.includes(amenity) ? "bg-ink text-white" : ""}`}
+                  onClick={() => toggleAmenity(amenity)}
+                >
+                  {amenity.replaceAll("_", " ")}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

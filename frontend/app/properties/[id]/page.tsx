@@ -1,20 +1,39 @@
-import { API_URL } from "@/lib/api";
+import { SERVER_API_URL } from "@/lib/api";
 
 async function getProperty(id: string) {
-  const response = await fetch(`${API_URL}/api/properties/${id}`, { cache: "no-store" });
-  if (!response.ok) return null;
-  return response.json();
+  try {
+    const response = await fetch(`${SERVER_API_URL}/api/properties/${id}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
 }
 
 async function getReviews(id: string) {
-  const response = await fetch(`${API_URL}/api/properties/${id}/reviews?limit=12`, { cache: "no-store" });
-  if (!response.ok) return [];
-  return response.json();
+  try {
+    const response = await fetch(`${SERVER_API_URL}/api/properties/${id}/reviews?limit=12`, { cache: "no-store" });
+    if (!response.ok) return [];
+    return response.json();
+  } catch {
+    return [];
+  }
+}
+
+async function getCalendar(id: string) {
+  try {
+    const response = await fetch(`${SERVER_API_URL}/api/properties/${id}/calendar`, { cache: "no-store" });
+    if (!response.ok) return [];
+    return response.json();
+  } catch {
+    return [];
+  }
 }
 
 export default async function PropertyPage({ params }: { params: { id: string } }) {
   const property = await getProperty(params.id);
   const reviews = await getReviews(params.id);
+  const calendar = await getCalendar(params.id);
   if (!property) return <main className="p-8">Property not found.</main>;
   const symbol = property.currency === "GBP" ? "£" : "€";
 
@@ -38,6 +57,12 @@ export default async function PropertyPage({ params }: { params: { id: string } 
           </div>
           <section className="mt-8">
             <h2 className="text-2xl font-black">Reviews</h2>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="chip">cleanliness {property.rating_cleanliness ?? "n/a"}</span>
+              <span className="chip">location {property.rating_location ?? "n/a"}</span>
+              <span className="chip">value {property.rating_value ?? "n/a"}</span>
+              <span className="chip">communication {property.rating_communication ?? "n/a"}</span>
+            </div>
             <div className="mt-3 grid gap-3">
               {reviews.map((review: any) => (
                 <article key={review.id} id={`review-${review.id}`} className="card p-4">
@@ -57,6 +82,20 @@ export default async function PropertyPage({ params }: { params: { id: string } 
           </div>
           <a href={`/reserve/${property.id}`} className="button mt-4 block text-center">Reserve</a>
           <div className="mt-5 rounded-2xl bg-[#dbe7df] p-4 text-sm">Embedded map placeholder: {property.nearest_transit ? `near ${property.nearest_transit}` : property.neighbourhood}</div>
+          <div className="mt-5">
+            <h2 className="font-black">Availability calendar</h2>
+            <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px]">
+              {calendar.slice(0, 35).map((day: any) => (
+                <div
+                  key={day.date}
+                  className={`rounded-lg p-2 ${day.available ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}
+                  title={`${day.date} · ${day.available ? "available" : "unavailable"}`}
+                >
+                  {String(day.date).slice(5)}
+                </div>
+              ))}
+            </div>
+          </div>
         </aside>
       </div>
     </main>
