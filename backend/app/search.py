@@ -53,10 +53,10 @@ async def search_properties(conn: AsyncConnection, params: SearchParams) -> Sear
         where.append("property_type ILIKE :property_type")
         values["property_type"] = f"%{params.property_type}%"
     if params.amenities:
-        where.append("amenities_normalized @> :amenities")
+        where.append("amenities_normalized @> CAST(:amenities AS text[])")
         values["amenities"] = params.amenities
     if params.exclude_neighbourhoods:
-        where.append("NOT (lower(neighbourhood) = ANY(:exclude_neighbourhoods))")
+        where.append("NOT (lower(neighbourhood) = ANY(CAST(:exclude_neighbourhoods AS text[])))")
         values["exclude_neighbourhoods"] = [n.lower() for n in params.exclude_neighbourhoods]
     if params.near_transit is not None:
         where.append("near_transit = :near_transit")

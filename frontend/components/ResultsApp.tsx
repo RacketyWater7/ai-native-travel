@@ -13,13 +13,25 @@ export function ResultsApp() {
   const [items, setItems] = useState<Property[]>([]);
   const [total, setTotal] = useState(0);
   const [compare, setCompare] = useState<number[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const chips = useMemo(() => [`city: ${city}`, `max price: ${maxPrice}`, nearTransit ? "near transit" : "any transit"], [city, maxPrice, nearTransit]);
 
   async function runSearch() {
-    const data = await searchProperties({ city, max_price: maxPrice, near_transit: nearTransit, page_size: 12 });
-    setItems(data.items);
-    setTotal(data.total);
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await searchProperties({ city, max_price: maxPrice, near_transit: nearTransit, page_size: 12 });
+      setItems(data.items);
+      setTotal(data.total);
+    } catch (err) {
+      setItems([]);
+      setTotal(0);
+      setError(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function applyNaturalLanguage() {
@@ -31,7 +43,9 @@ export function ResultsApp() {
     const intent = await response.json();
     if (intent.city) setCity(intent.city);
     if (intent.budget_per_night) setMaxPrice(String(intent.budget_per_night));
-    setNearTransit(Boolean(intent.hard_constraints?.near_transit));
+    if (intent.hard_constraints?.near_transit !== undefined) {
+      setNearTransit(Boolean(intent.hard_constraints.near_transit));
+    }
   }
 
   useEffect(() => {
@@ -64,9 +78,10 @@ export function ResultsApp() {
         </div>
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-black">{total} stays</h2>
+          <h2 className="text-2xl font-black">{loading ? "Loading stays..." : `${total} stays`}</h2>
           <a className="chip" href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
         </div>
+        {error ? <div className="card mb-4 border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
         <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
           <div className="grid gap-5 md:grid-cols-2">
             {items.map((property) => (

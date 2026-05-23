@@ -16,8 +16,8 @@ class SearchParams(BaseModel):
     min_rating: float | None = None
     room_type: str | None = None
     property_type: str | None = None
-    amenities: list[str] = Field(default_factory=list)
-    exclude_neighbourhoods: list[str] = Field(default_factory=list)
+    amenities: list[str] | None = None
+    exclude_neighbourhoods: list[str] | None = None
     near_transit: bool | None = None
     q: str | None = None
     sort: Literal["price_asc", "rating", "popularity", "distance"] = "rating"

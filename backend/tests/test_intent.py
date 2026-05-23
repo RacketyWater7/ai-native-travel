@@ -23,3 +23,9 @@ def test_dubai_template_parses_unsupported_city():
     assert query.city == "Dubai"
     assert query.currency == "AED"
     assert query.hard_constraints["exclude_neighbourhoods"] == ["Deira"]
+
+
+def test_symbol_budget_without_per_night_suffix_defaults_to_nightly_budget():
+    query = parse_intent_deterministic("a quiet 1-bed in Lisbon under €130 with a balcony")
+
+    assert query.budget_per_night == 130

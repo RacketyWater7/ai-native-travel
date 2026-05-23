@@ -14,6 +14,8 @@ build/
 data/cache/
 data/downloads/
 data/*.db
+backend/data/
+*.egg-info/
 coverage/
 .DS_Store
 *.log

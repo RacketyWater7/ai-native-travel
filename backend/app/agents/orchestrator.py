@@ -43,6 +43,8 @@ def parse_intent_deterministic(message: str, today: date | None = None) -> Trave
         query.check_out = check_in + timedelta(days=query.nights or (check_out - check_in).days)
 
     per_night = re.search(r"under\s*[€£]?\s*(\d+)\s*(?:a|per)?\s*night", text_lower)
+    if not per_night:
+        per_night = re.search(r"under\s*[€£]\s*(\d+)", text_lower)
     if per_night:
         query.budget_per_night = float(per_night.group(1))
     total = re.search(r"budget\s*[€£]?\s*(\d+)\s*total|[€£]\s*(\d+)\s*total", text_lower)
