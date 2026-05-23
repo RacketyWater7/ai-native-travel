@@ -26,6 +26,7 @@ export function ResultsApp() {
   const [compare, setCompare] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [compareToast, setCompareToast] = useState<string | null>(null);
 
   const chips = useMemo(
     () => [
@@ -105,6 +106,12 @@ export function ResultsApp() {
     );
   }
 
+  function addToCompare(property: Property) {
+    setCompare((current) => Array.from(new Set([...current, property.id])).slice(0, 4));
+    setCompareToast(`${property.name} added to compare`);
+    window.setTimeout(() => setCompareToast(null), 2200);
+  }
+
   return (
     <main className="min-h-screen px-6 py-6">
       <section className="mx-auto max-w-7xl">
@@ -154,13 +161,23 @@ export function ResultsApp() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-black">{loading ? "Loading stays..." : `${total} stays`}</h2>
-          <a className="chip" href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
+          <a className={`chip transition ${compare.length ? "animate-pulse border-coral bg-white shadow-lg shadow-red-100" : ""}`} href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
         </div>
+        {compareToast ? (
+          <div className="fixed left-1/2 top-5 z-40 -translate-x-1/2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white shadow-2xl">
+            {compareToast} · open Compare {compare.length}
+          </div>
+        ) : null}
         {error ? <div className="card mb-4 border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
         <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
           <div className="grid gap-5 md:grid-cols-2">
             {items.map((property) => (
-              <PropertyCard key={property.id} property={property} onCompare={(id) => setCompare((current) => Array.from(new Set([...current, id])).slice(0, 4))} />
+              <PropertyCard
+                key={property.id}
+                property={property}
+                isCompared={compare.includes(property.id)}
+                onCompare={() => addToCompare(property)}
+              />
             ))}
           </div>
           <div className="sticky top-5 h-[720px] rounded-3xl bg-[#dbe7df] p-4">

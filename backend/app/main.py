@@ -9,6 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.agents.orchestrator import concierge_stream, parse_intent_deterministic
 from app.config import get_settings
 from app.db import get_conn
+from app.llm import generate_compare_verdict
 from app.models import ConciergeRequest, SearchParams
 from app.search import search_properties
 
@@ -102,12 +103,24 @@ async def wishlist(payload: dict, conn: Annotated[AsyncConnection, Depends(get_c
 async def compare(ids: str, conn: Annotated[AsyncConnection, Depends(get_conn)]):
     id_list = [int(item) for item in ids.split(",") if item.strip()]
     result = await conn.execute(
-        text("SELECT * FROM properties WHERE id = ANY(CAST(:ids AS bigint[]))"),
+        text(
+            """
+            SELECT id, city, name, property_type, room_type_normalized, neighbourhood,
+                   latitude, longitude, accommodates, bedrooms, beds, bathrooms,
+                   price_per_night, currency, amenities_normalized, picture_url,
+                   host_is_superhost, instant_bookable, near_transit, nearest_transit,
+                   review_count, rating_overall, rating_cleanliness, rating_location,
+                   rating_value, rating_communication, price_percentile_in_area,
+                   ai_review_summary, ai_review_summary_citations
+            FROM properties
+            WHERE id = ANY(CAST(:ids AS bigint[]))
+            """
+        ),
         {"ids": id_list},
     )
     items = [dict(row) for row in result.mappings().all()]
-    verdict = "Best value is the lowest price among similarly rated stays; review consistency uses stored aspect sentiment."
-    return {"items": items, "ai_verdict": verdict}
+    verdict, usage = await generate_compare_verdict(items)
+    return {"items": items, "ai_verdict": verdict, "usage": usage}
 
 
 @app.post("/api/concierge")

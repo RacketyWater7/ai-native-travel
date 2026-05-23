@@ -10,36 +10,57 @@ export function Concierge() {
   const [steps, setSteps] = useState<Step[]>([]);
   const [final, setFinal] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function ask() {
     setLoading(true);
     setSteps([]);
     setFinal("");
-    const response = await fetch(`${API_URL}/api/concierge`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, session_id: "demo" })
-    });
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    if (!reader) return;
-    let buffer = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const chunks = buffer.split("\n\n");
-      buffer = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const event = chunk.match(/^event: (.+)$/m)?.[1];
-        const data = chunk.match(/^data: (.+)$/m)?.[1];
-        if (!event || !data) continue;
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/concierge`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message, session_id: "demo" })
+      });
+      if (!response.ok || !response.body) throw new Error("Concierge stream failed to start");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const consumeBlock = (block: string) => {
+        const lines = block.split(/\r?\n/);
+        const event = lines.find((line) => line.startsWith("event: "))?.slice(7).trim();
+        const data = lines
+          .filter((line) => line.startsWith("data: "))
+          .map((line) => line.slice(6))
+          .join("\n");
+        if (!event || !data) return;
         const parsed = JSON.parse(data);
+        if (event === "request") {
+          setSteps((current) => [...current, { name: "Request", status: "started", detail: parsed }]);
+        }
         if (event === "step") setSteps((current) => [...current, parsed]);
         if (event === "final") setFinal(JSON.stringify(parsed, null, 2));
+        if (event === "done") {
+          setSteps((current) => [...current, { name: "Trace saved", status: "finished", detail: parsed }]);
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split(/\r?\n\r?\n/);
+        buffer = chunks.pop() ?? "";
+        chunks.forEach(consumeBlock);
       }
+      if (buffer.trim()) consumeBlock(buffer);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Concierge failed");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -53,7 +74,11 @@ export function Concierge() {
         value={message}
         onChange={(event) => setMessage(event.target.value)}
       />
-      <button className="button mt-2" onClick={ask} disabled={loading}>{loading ? "Thinking..." : "Ask concierge"}</button>
+      <button className="button mt-2 relative overflow-hidden" onClick={ask} disabled={loading}>
+        {loading ? "Thinking..." : "Ask concierge"}
+        {loading ? <span className="absolute inset-x-0 bottom-0 h-1 animate-pulse bg-white/70" /> : null}
+      </button>
+      {error ? <div className="mt-2 rounded-2xl bg-red-50 p-3 text-xs text-red-700">{error}</div> : null}
       <div className="mt-3 max-h-48 space-y-2 overflow-auto text-xs">
         {steps.map((step, index) => (
           <div key={`${step.name}-${index}`} className="rounded-2xl bg-sand p-2">

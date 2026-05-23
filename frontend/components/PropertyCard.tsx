@@ -6,14 +6,22 @@ const money = (currency: string | null, value: number | null) => {
   return `${symbol}${Math.round(value)}`;
 };
 
-export function PropertyCard({ property, onCompare }: { property: Property; onCompare?: (id: number) => void }) {
+export function PropertyCard({
+  property,
+  onCompare,
+  isCompared = false
+}: {
+  property: Property;
+  onCompare?: (id: number) => void;
+  isCompared?: boolean;
+}) {
   const priceRank =
     property.price_percentile_in_area == null
       ? null
       : `Cheaper than ${Math.round(property.price_percentile_in_area * 100)}% nearby`;
 
   return (
-    <article className="card overflow-hidden">
+    <article className={`card overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-xl ${isCompared ? "ring-2 ring-coral" : ""}`}>
       <img
         className="h-48 w-full object-cover"
         src={property.picture_url ?? `https://picsum.photos/seed/${property.id}/800/600`}
@@ -43,7 +51,12 @@ export function PropertyCard({ property, onCompare }: { property: Property; onCo
         </div>
         <div className="flex gap-2">
           <a className="button" href={`/properties/${property.id}`}>View stay</a>
-          <button className="chip" onClick={() => onCompare?.(property.id)}>Compare</button>
+          <button
+            className={`chip transition ${isCompared ? "border-coral bg-coral text-white shadow-lg shadow-red-200" : "hover:border-coral"}`}
+            onClick={() => onCompare?.(property.id)}
+          >
+            {isCompared ? "Added to compare" : "Compare"}
+          </button>
         </div>
       </div>
     </article>

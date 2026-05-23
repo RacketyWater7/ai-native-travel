@@ -1,8 +1,14 @@
 import { SERVER_API_URL } from "@/lib/api";
 
+type CompareData = {
+  items: any[];
+  ai_verdict: string;
+  usage?: { provider?: string };
+};
+
 export default async function ComparePage({ searchParams }: { searchParams: { ids?: string } }) {
   const ids = searchParams.ids ?? "";
-  let data = { items: [], ai_verdict: "Pick 2-4 listings to compare." };
+  let data: CompareData = { items: [], ai_verdict: "Pick 2-4 listings to compare." };
   if (ids) {
     try {
       const response = await fetch(`${SERVER_API_URL}/api/compare?ids=${ids}`, { cache: "no-store" });
@@ -17,7 +23,10 @@ export default async function ComparePage({ searchParams }: { searchParams: { id
       <a className="chip" href="/">Back to search</a>
       <h1 className="mt-5 text-4xl font-black">Compare stays</h1>
       <div className="card mt-5 p-5">
-        <h2 className="font-black">AI verdict</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-black">AI verdict</h2>
+          {data.usage?.provider ? <span className="chip">{data.usage.provider}</span> : null}
+        </div>
         <p className="mt-2 text-black/70">{data.ai_verdict}</p>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">

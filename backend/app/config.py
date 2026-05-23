@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     cors_origins: str = "http://localhost:3000"
     app_env: str = "local"
-    mock_llm: bool = Field(default=True, validation_alias="MOCK_LLM")
+    mock_llm: bool = Field(default=False, validation_alias="MOCK_LLM")
 
     @property
     def origins(self) -> list[str]:
