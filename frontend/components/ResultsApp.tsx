@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_URL, PropertyCard as Property, searchProperties } from "@/lib/api";
 import { PropertyCard } from "@/components/PropertyCard";
-import { Concierge } from "@/components/Concierge";
 
 const AMENITIES = ["wifi", "kitchen", "washer", "balcony", "river_view", "free_parking", "gym"];
 
@@ -106,9 +105,12 @@ export function ResultsApp() {
     );
   }
 
-  function addToCompare(property: Property) {
-    setCompare((current) => Array.from(new Set([...current, property.id])).slice(0, 4));
-    setCompareToast(`${property.name} added to compare`);
+  function toggleCompare(property: Property) {
+    const isCompared = compare.includes(property.id);
+    setCompare((current) =>
+      isCompared ? current.filter((id) => id !== property.id) : Array.from(new Set([...current, property.id])).slice(0, 4)
+    );
+    setCompareToast(`${property.name} ${isCompared ? "removed from" : "added to"} compare`);
     window.setTimeout(() => setCompareToast(null), 2200);
   }
 
@@ -149,7 +151,7 @@ export function ResultsApp() {
               {AMENITIES.map((amenity) => (
                 <button
                   key={amenity}
-                  className={`chip ${amenities.includes(amenity) ? "bg-ink text-white" : ""}`}
+                  className={`chip ${amenities.includes(amenity) ? "chip-selected" : ""}`}
                   onClick={() => toggleAmenity(amenity)}
                 >
                   {amenity.replaceAll("_", " ")}
@@ -161,7 +163,7 @@ export function ResultsApp() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-black">{loading ? "Loading stays..." : `${total} stays`}</h2>
-          <a className={`chip transition ${compare.length ? "animate-pulse border-coral bg-white shadow-lg shadow-red-100" : ""}`} href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
+          <a className={`chip transition ${compare.length ? "chip-coral animate-pulse" : ""}`} href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
         </div>
         {compareToast ? (
           <div className="fixed left-1/2 top-5 z-40 -translate-x-1/2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white shadow-2xl">
@@ -176,7 +178,7 @@ export function ResultsApp() {
                 key={property.id}
                 property={property}
                 isCompared={compare.includes(property.id)}
-                onCompare={() => addToCompare(property)}
+                onCompare={() => toggleCompare(property)}
               />
             ))}
           </div>
@@ -193,7 +195,6 @@ export function ResultsApp() {
           </div>
         </div>
       </section>
-      <Concierge />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { NavigationLoader } from "@/components/NavigationLoader";
+import { Concierge } from "@/components/Concierge";
 
 export const metadata: Metadata = {
   title: "AI Native Travel Discovery",
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <NavigationLoader />
         {children}
+        <Concierge />
       </body>
     </html>
   );

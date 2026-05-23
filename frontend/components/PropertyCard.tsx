@@ -52,7 +52,7 @@ export function PropertyCard({
         <div className="flex gap-2">
           <a className="button" href={`/properties/${property.id}`}>View stay</a>
           <button
-            className={`chip transition ${isCompared ? "border-coral bg-coral text-white shadow-lg shadow-red-200" : "hover:border-coral"}`}
+            className={`chip transition ${isCompared ? "chip-coral" : "hover:border-coral"}`}
             onClick={() => onCompare?.(property.id)}
           >
             {isCompared ? "Added to compare" : "Compare"}

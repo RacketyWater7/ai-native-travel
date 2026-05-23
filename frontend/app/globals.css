@@ -3,18 +3,34 @@
 @tailwind utilities;
 
 body {
-  background: #f8f4ef;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 90, 95, 0.14), transparent 30rem),
+    radial-gradient(circle at top right, rgba(22, 33, 62, 0.12), transparent 28rem),
+    #f8f4ef;
   color: #16213e;
 }
 
+::selection {
+  background: rgba(255, 90, 95, 0.22);
+}
+
 .card {
-  @apply rounded-3xl border border-black/10 bg-white shadow-sm;
+  @apply rounded-3xl border border-white/70 bg-white/90 shadow-sm shadow-black/5 backdrop-blur transition duration-300 hover:shadow-xl hover:shadow-black/10;
 }
 
 .button {
-  @apply rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500;
+  @apply rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-200 transition duration-300 hover:-translate-y-0.5 hover:bg-red-500 hover:shadow-xl hover:shadow-red-200 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 .chip {
-  @apply rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium;
+  @apply rounded-full border border-black/10 bg-white/90 px-3 py-1 text-xs font-medium shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-coral hover:shadow-md;
+}
+
+.chip-selected {
+  @apply border-ink bg-ink text-white shadow-lg shadow-ink/10 hover:border-ink;
+}
+
+.chip-coral {
+  @apply border-coral bg-coral text-white shadow-lg shadow-red-200 hover:border-coral hover:bg-red-500;
 }

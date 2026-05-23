@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 import time
@@ -10,6 +9,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from app.llm import generate_concierge_answer, generate_intent, generate_review_intelligence
 from app.models import ConciergeRequest, SearchParams, TraceStep, TravelQuery
 from app.search import search_properties
 
@@ -101,6 +101,65 @@ def travel_query_to_search(query: TravelQuery) -> SearchParams:
     )
 
 
+def _compact_property(item: Any) -> dict[str, Any]:
+    data = item.model_dump(mode="json") if hasattr(item, "model_dump") else dict(item)
+    return {
+        "id": data.get("id"),
+        "name": data.get("name"),
+        "city": data.get("city"),
+        "neighbourhood": data.get("neighbourhood"),
+        "room_type": data.get("room_type_normalized"),
+        "accommodates": data.get("accommodates"),
+        "bedrooms": data.get("bedrooms"),
+        "price_per_night": data.get("price_per_night"),
+        "total_price": data.get("total_price"),
+        "currency": data.get("currency"),
+        "amenities": data.get("amenities_normalized") or [],
+        "near_transit": data.get("near_transit"),
+        "nearest_transit": data.get("nearest_transit"),
+        "rating_overall": data.get("rating_overall"),
+        "review_count": data.get("review_count"),
+        "price_percentile_in_area": data.get("price_percentile_in_area"),
+        "ai_review_summary": data.get("ai_review_summary"),
+        "rationale": data.get("rationale"),
+    }
+
+
+async def _review_snippets(conn: AsyncConnection, property_ids: list[int]) -> list[dict[str, Any]]:
+    if not property_ids:
+        return []
+    result = await conn.execute(
+        text(
+            """
+            SELECT id, property_id, date, reviewer_name, language, rating, comments,
+                   sent_cleanliness, sent_location, sent_value, sent_staff, sent_noise
+            FROM reviews
+            WHERE property_id = ANY(CAST(:ids AS bigint[]))
+              AND comments IS NOT NULL
+            ORDER BY rating DESC NULLS LAST, date DESC NULLS LAST
+            LIMIT 36
+            """
+        ),
+        {"ids": property_ids[:8]},
+    )
+    snippets = []
+    for row in result.mappings().all():
+        data = dict(row)
+        comment = data.get("comments") or ""
+        data["comments"] = comment[:420]
+        snippets.append(data)
+    return snippets
+
+
+def _usage_add(total: dict[str, Any], usage: dict[str, Any]) -> None:
+    total["tokens"] = int(total.get("tokens", 0)) + int(usage.get("tokens", 0) or 0)
+    total["cost_usd"] = float(total.get("cost_usd", 0)) + float(usage.get("cost_usd", 0) or 0)
+    providers = total.setdefault("providers", [])
+    provider = usage.get("provider")
+    if provider and provider not in providers:
+        providers.append(provider)
+
+
 async def _event(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, default=str)}
 
@@ -111,6 +170,7 @@ async def concierge_stream(
     request_id = str(uuid.uuid4())
     steps: list[TraceStep] = []
     started = time.perf_counter()
+    usage_total: dict[str, Any] = {"tokens": 0, "cost_usd": 0, "providers": []}
 
     async def emit_step(name: str, status: str, detail: dict[str, Any]) -> dict[str, str]:
         step = TraceStep(name=name, status=status, detail=detail)
@@ -120,53 +180,117 @@ async def concierge_stream(
     yield await _event("request", {"request_id": request_id})
 
     yield await emit_step("Intent", "started", {"message": request.message})
-    intent = parse_intent_deterministic(request.message)
-    await asyncio.sleep(0)
-    yield await emit_step("Intent", "finished", {"travel_query": intent.model_dump()})
+    fallback_intent = parse_intent_deterministic(request.message)
+    intent, intent_usage = await generate_intent(
+        request.message, request.current_filters, fallback_intent, date.today().isoformat()
+    )
+    _usage_add(usage_total, intent_usage)
+    yield await emit_step(
+        "Intent",
+        "finished",
+        {
+            "agent": "Intent Agent",
+            "provider": intent_usage.get("provider"),
+            "travel_query": intent.model_dump(mode="json"),
+        },
+    )
 
     route = "itinerary" if "plan" in request.message.lower() or "trip" in request.message.lower() else "search"
     if intent.city and intent.city.lower() not in {"lisbon", "london"}:
-        yield await emit_step("Retrieval", "degraded", {"reason": "no inventory for this city"})
-        final = {"type": "empty", "message": f"No inventory is loaded for {intent.city}.", "items": []}
+        yield await emit_step(
+            "Retrieval",
+            "degraded",
+            {
+                "agent": "Retrieval Agent",
+                "reason": f"No loaded inventory for {intent.city}",
+                "supported_cities": ["Lisbon", "London"],
+            },
+        )
+        final = {
+            "type": "empty",
+            "title": f"{intent.city} is not in the loaded inventory yet",
+            "summary": (
+                "I will not invent stays that are not in the database. "
+                "This demo currently has searchable inventory for Lisbon and London."
+            ),
+            "traveler_notes": [
+                "Try Lisbon or London for fully grounded recommendations.",
+                "The agent still parsed your intent and preserved your hard constraints.",
+            ],
+            "intent": intent.model_dump(mode="json"),
+            "items": [],
+        }
         yield await _event("final", final)
     else:
-        yield await emit_step("Retrieval", "started", {"route": route})
+        yield await emit_step(
+            "Retrieval",
+            "started",
+            {"agent": "Retrieval Agent", "route": route, "search": travel_query_to_search(intent).model_dump(mode="json")},
+        )
         response = await search_properties(conn, travel_query_to_search(intent))
+        candidates = [_compact_property(item) for item in response.items[:8]]
         yield await emit_step(
             "Retrieval",
             "finished",
-            {"count": response.total, "weights": response.weights, "top_ids": [p.id for p in response.items[:5]]},
+            {
+                "agent": "Retrieval Agent",
+                "count": response.total,
+                "weights": response.weights,
+                "top_ids": [p.id for p in response.items[:5]],
+                "rationale": "Structured filters are combined with ranking signals already stored in the corpus.",
+            },
         )
 
-        if route == "itinerary":
-            yield await emit_step("Itinerary", "started", {"budget_total": intent.budget_total})
-            stays = response.items[:2]
-            total = sum(float(stay.total_price or stay.price_per_night or 0) for stay in stays)
-            final = {
-                "type": "itinerary",
-                "budget_total": intent.budget_total,
-                "estimated_total": total,
-                "days": [
-                    {"day": 1, "title": "Arrive and settle in", "property": stays[0].model_dump() if stays else None},
-                    {"day": 3, "title": "Swap to the splurge stay", "property": stays[1].model_dump() if len(stays) > 1 else None},
-                ],
-            }
-            yield await emit_step("Itinerary", "finished", {"estimated_total": total})
-            yield await _event("final", final)
-        else:
-            yield await emit_step("Review Intelligence", "started", {"candidate_count": len(response.items)})
-            most_consistent = response.items[0] if response.items else None
-            yield await emit_step(
-                "Review Intelligence",
-                "finished",
-                {"most_consistent_id": most_consistent.id if most_consistent else None},
-            )
-            yield await _event(
-                "final",
-                {"type": "search", "items": [item.model_dump() for item in response.items]},
-            )
+        yield await emit_step(
+            "Review Intelligence",
+            "started",
+            {"agent": "Review Intelligence Agent", "candidate_count": len(candidates)},
+        )
+        snippets = await _review_snippets(conn, [int(item["id"]) for item in candidates])
+        review_intelligence, review_usage = await generate_review_intelligence(
+            intent, candidates, snippets
+        )
+        _usage_add(usage_total, review_usage)
+        yield await emit_step(
+            "Review Intelligence",
+            "finished",
+            {
+                "agent": "Review Intelligence Agent",
+                "provider": review_usage.get("provider"),
+                "fallback_reason": review_usage.get("fallback_reason"),
+                "headline": review_intelligence.get("headline"),
+                "citations": sum(
+                    len(item.get("citations", []))
+                    for item in review_intelligence.get("insights", [])
+                    if isinstance(item, dict)
+                ),
+            },
+        )
+
+        final_agent = "Itinerary Agent" if route == "itinerary" else "Concierge Answer Agent"
+        yield await emit_step(final_agent.replace(" Agent", ""), "started", {"agent": final_agent})
+        final, final_usage = await generate_concierge_answer(
+            route, request.message, intent, candidates, review_intelligence
+        )
+        _usage_add(usage_total, final_usage)
+        final["intent"] = intent.model_dump(mode="json")
+        final["candidates"] = candidates[:4]
+        final["review_intelligence"] = review_intelligence
+        final["usage"] = usage_total
+        yield await emit_step(
+            final_agent.replace(" Agent", ""),
+            "finished",
+            {
+                "agent": final_agent,
+                "provider": final_usage.get("provider"),
+                "fallback_reason": final_usage.get("fallback_reason"),
+                "tokens_so_far": usage_total["tokens"],
+            },
+        )
+        yield await _event("final", final)
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
+    usage_total["latency_ms"] = elapsed_ms
     await conn.execute(
         text(
             """
@@ -180,9 +304,9 @@ async def concierge_stream(
             "session_id": request.session_id,
             "query": request.message,
             "steps": json.dumps([step.model_dump(mode="json") for step in steps]),
-            "tokens": 0,
-            "cost": 0,
+            "tokens": usage_total["tokens"],
+            "cost": usage_total["cost_usd"],
             "latency": elapsed_ms,
         },
     )
-    yield await _event("done", {"request_id": request_id, "latency_ms": elapsed_ms})
+    yield await _event("done", {"request_id": request_id, **usage_total})
