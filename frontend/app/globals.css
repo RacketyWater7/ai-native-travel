@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #f8f4ef;
+  color: #16213e;
+}
+
+.card {
+  @apply rounded-3xl border border-black/10 bg-white shadow-sm;
+}
+
+.button {
+  @apply rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500;
+}
+
+.chip {
+  @apply rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium;
+}
