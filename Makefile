@@ -1,10 +1,10 @@
 .PHONY: ingest seed test backend frontend
 
 ingest:
-	python -m pipeline.ingest --mock-llm --sample
+	cd backend && python -m pipeline.ingest --mock-llm --sample
 
 seed:
-	python -m pipeline.ingest --mock-llm --sample --seed-only
+	cd backend && python -m pipeline.ingest --mock-llm --sample --seed-only
 
 test:
 	cd backend && pytest
