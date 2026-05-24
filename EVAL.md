@@ -32,4 +32,4 @@ python -m pipeline.eval_harness
 - London itinerary: 4/5 intent, 3/5 retrieval, 3/5 citations, 5/5 hallucination, 3/5 budget adherence.
 - Dubai template: 5/5 intent, 5/5 graceful inventory failure.
 
-The seed harness is intentionally deterministic and conservative; real-data scores should be recorded after a full ingest.
+The current evaluation uses the seeded production-like dataset loaded into Supabase/local Postgres. Scores should be re-recorded after any larger full ingest or material retrieval/agent changes.

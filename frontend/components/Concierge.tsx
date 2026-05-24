@@ -149,11 +149,14 @@ export function Concierge() {
   }
 
   return (
-    <aside className="fixed bottom-5 right-5 z-20 max-h-[calc(100vh-2rem)] w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-2xl shadow-black/20 backdrop-blur-xl transition duration-300">
+    <aside className={`fixed bottom-5 right-5 z-20 max-h-[calc(100vh-2rem)] w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-2xl shadow-black/20 backdrop-blur-xl transition duration-300 ${loading ? "ring-4 ring-coral/15" : ""}`}>
       <div className="max-h-[calc(100vh-2rem)] overflow-auto p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="font-black">AI concierge</h2>
-        <span className="rounded-full bg-ink px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">4-agent SSE</span>
+        <div>
+          <h2 className="font-black">AI concierge</h2>
+          {loading ? <div className="text-[11px] font-medium text-black/50">Agents are streaming a grounded answer</div> : null}
+        </div>
+        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white ${loading ? "animate-pulse bg-coral" : "bg-ink"}`}>4-agent SSE</span>
       </div>
       <textarea
         className="h-24 w-full rounded-2xl border border-black/10 bg-white/80 p-3 text-sm shadow-inner outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/10"
@@ -161,15 +164,39 @@ export function Concierge() {
         onChange={(event) => setMessage(event.target.value)}
       />
       <button className="button mt-2 relative overflow-hidden" onClick={ask} disabled={loading}>
-        {loading ? "Thinking..." : "Ask concierge"}
+        <span className="relative z-10 flex items-center gap-2">
+          {loading ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : null}
+          {loading ? "Building your answer..." : "Ask concierge"}
+        </span>
         {loading ? <span className="absolute inset-x-0 bottom-0 h-1 animate-pulse bg-white/70" /> : null}
       </button>
       {error ? <div className="mt-2 rounded-2xl bg-red-50 p-3 text-xs text-red-700">{error}</div> : null}
+      {loading ? (
+        <div className="mt-3 overflow-hidden rounded-3xl border border-coral/15 bg-gradient-to-br from-coral/10 via-white to-sand p-3 shadow-inner">
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10">
+              <span className="absolute inset-0 animate-ping rounded-full bg-coral/25" />
+              <span className="absolute inset-1 rounded-full bg-coral/15" />
+              <span className="absolute inset-3 rounded-full bg-coral" />
+            </div>
+            <div>
+              <div className="text-sm font-black">Concierge is working</div>
+              <div className="text-xs leading-5 text-black/55">Parsing intent, retrieving stays, reading reviews, and composing a recommendation.</div>
+            </div>
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
+            <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-coral via-fuchsia-500 to-cyan-400" />
+          </div>
+        </div>
+      ) : null}
       <div className="mt-3 space-y-2 text-xs">
         {steps.map((step, index) => (
-          <div key={`${step.name}-${index}`} className="rounded-2xl bg-sand p-2 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md">
+          <div key={`${step.name}-${index}`} className={`rounded-2xl bg-sand p-2 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md ${loading && index === steps.length - 1 ? "ring-2 ring-coral/20" : ""}`}>
             <div className="flex items-center justify-between gap-2">
-              <b>{step.name}</b>
+              <b className="flex items-center gap-2">
+                {loading && index === steps.length - 1 ? <span className="h-2 w-2 animate-pulse rounded-full bg-coral" /> : null}
+                {step.name}
+              </b>
               <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold">{step.status}</span>
             </div>
             <div className="mt-1 space-y-0.5 text-[11px] text-black/60">
