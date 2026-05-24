@@ -117,17 +117,19 @@ export function ResultsApp() {
   return (
     <main className="min-h-screen px-6 py-6">
       <section className="mx-auto max-w-7xl">
-        <div className="mb-6 rounded-[2rem] bg-ink p-8 text-white">
-          <p className="text-sm uppercase tracking-[0.2em] text-white/60">AI-native travel discovery</p>
-          <h1 className="mt-2 max-w-3xl text-4xl font-black">A real booking surface with an agentic concierge woven through it.</h1>
-          <p className="mt-3 max-w-2xl text-white/70">Search Lisbon and London stays, edit filter chips, inspect maps and reviews, save comparisons, and stream grounded agent steps.</p>
+        <div className="relative mb-6 overflow-hidden rounded-[2rem] bg-ink p-8 text-white shadow-2xl shadow-ink/20">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-coral/25 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+          <p className="relative text-sm uppercase tracking-[0.2em] text-white/60">AI-native travel discovery</p>
+          <h1 className="relative mt-2 max-w-3xl text-4xl font-black">A real booking surface with an agentic concierge woven through it.</h1>
+          <p className="relative mt-3 max-w-2xl text-white/70">Search Lisbon and London stays, edit filter chips, inspect maps and reviews, save comparisons, and stream grounded agent steps.</p>
         </div>
 
         <div className="card mb-6 grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <label className="text-xs font-bold uppercase text-black/50">Natural language search</label>
             <div className="mt-2 flex gap-2">
-              <input className="w-full rounded-full border border-black/10 px-4 py-3" value={nl} onChange={(event) => setNl(event.target.value)} />
+              <input className="w-full rounded-full border border-black/10 bg-white/80 px-4 py-3 shadow-inner outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/10" value={nl} onChange={(event) => setNl(event.target.value)} />
               <button className="button" onClick={applyNaturalLanguage}>Apply</button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{chips.map((chip) => <span className="chip" key={chip}>{chip}</span>)}</div>
@@ -162,7 +164,18 @@ export function ResultsApp() {
         </div>
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-black">{loading ? "Loading stays..." : `${total} stays`}</h2>
+          <div>
+            <h2 className="text-2xl font-black">{loading ? "Finding the best stays..." : `${total} stays`}</h2>
+            {loading ? (
+              <div className="mt-2 flex items-center gap-2 text-sm text-black/55">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-coral opacity-60" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-coral" />
+                </span>
+                Refreshing prices, availability, and review signals
+              </div>
+            ) : null}
+          </div>
           <a className={`chip transition ${compare.length ? "chip-coral animate-pulse" : ""}`} href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</a>
         </div>
         {compareToast ? (
@@ -172,7 +185,18 @@ export function ResultsApp() {
         ) : null}
         {error ? <div className="card mb-4 border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
         <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="relative grid gap-5 md:grid-cols-2">
+            {loading ? (
+              <div className="absolute inset-0 z-10 grid place-items-center rounded-3xl bg-sand/70 backdrop-blur-sm">
+                <div className="card flex items-center gap-4 p-4">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-coral/20 border-t-coral" />
+                  <div>
+                    <div className="font-black">Curating stays</div>
+                    <div className="text-sm text-black/55">Matching your filters against live inventory.</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {items.map((property) => (
               <PropertyCard
                 key={property.id}
@@ -182,7 +206,7 @@ export function ResultsApp() {
               />
             ))}
           </div>
-          <div className="sticky top-5 h-[720px] rounded-3xl bg-[#dbe7df] p-4">
+          <div className="sticky top-5 h-[720px] rounded-3xl border border-white/70 bg-[#dbe7df]/90 p-4 shadow-xl shadow-black/5 backdrop-blur">
             <h3 className="font-black">Map view</h3>
             <p className="text-sm text-black/60">MapLibre/CARTO tiles are configured for production; seed demo renders synchronized price markers.</p>
             <div className="mt-4 grid gap-2">
