@@ -74,6 +74,7 @@ export function Concierge() {
   const [final, setFinal] = useState<ConciergeFinal | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(CONCIERGE_STORAGE_KEY);
@@ -148,15 +149,42 @@ export function Concierge() {
     }
   }
 
+  if (!expanded) {
+    return (
+      <button
+        className={`fixed bottom-5 right-5 z-20 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full border border-white/80 bg-ink px-4 py-3 text-left text-white shadow-2xl shadow-black/20 backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-black/30 ${loading ? "ring-4 ring-coral/20" : ""}`}
+        onClick={() => setExpanded(true)}
+      >
+        <span className="relative grid h-11 w-11 place-items-center rounded-full bg-coral text-lg font-black">
+          {loading ? <span className="absolute inset-0 animate-ping rounded-full bg-coral/50" /> : null}
+          <span className="relative">AI</span>
+        </span>
+        <span>
+          <span className="block text-sm font-black">{loading ? "Concierge is working" : final ? "Concierge answer ready" : "Travel copilot"}</span>
+          <span className="block text-xs text-white/65">{loading ? "Streaming agent steps" : final ? "Open recommendations" : "Plan with grounded agents"}</span>
+        </span>
+        <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Open</span>
+      </button>
+    );
+  }
+
   return (
     <aside className={`fixed bottom-5 right-5 z-20 max-h-[calc(100vh-2rem)] w-[460px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 shadow-2xl shadow-black/20 backdrop-blur-xl transition duration-300 ${loading ? "ring-4 ring-coral/15" : ""}`}>
       <div className="max-h-[calc(100vh-2rem)] overflow-auto p-4">
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <h2 className="font-black">AI concierge</h2>
+          <h2 className="font-black">Travel copilot</h2>
           {loading ? <div className="text-[11px] font-medium text-black/50">Agents are streaming a grounded answer</div> : null}
         </div>
-        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white ${loading ? "animate-pulse bg-coral" : "bg-ink"}`}>4-agent SSE</span>
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white ${loading ? "animate-pulse bg-coral" : "bg-ink"}`}>4-agent SSE</span>
+          <button
+            className="rounded-full bg-sand px-3 py-1 text-[11px] font-bold text-ink transition hover:bg-coral hover:text-white"
+            onClick={() => setExpanded(false)}
+          >
+            Minimize
+          </button>
+        </div>
       </div>
       <textarea
         className="h-24 w-full rounded-2xl border border-black/10 bg-white/80 p-3 text-sm shadow-inner outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/10"

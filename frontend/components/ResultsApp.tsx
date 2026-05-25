@@ -5,6 +5,19 @@ import { API_URL, PropertyCard as Property, searchProperties } from "@/lib/api";
 import { PropertyCard } from "@/components/PropertyCard";
 
 const AMENITIES = ["wifi", "kitchen", "washer", "balcony", "river_view", "free_parking", "gym"];
+const SUPPORTED_CITIES = ["London", "Lisbon"];
+const CITY_PATTERN = /\b(?:in|near|around|for)\s+([a-z]+(?:[\s-][a-z]+){0,2})\b/i;
+
+function inferCity(message: string) {
+  const supported = SUPPORTED_CITIES.find((item) => new RegExp(`\\b${item}\\b`, "i").test(message));
+  if (supported) return supported;
+  const match = message.match(CITY_PATTERN);
+  return match?.[1]
+    ?.trim()
+    .split(/[\s-]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
 
 export function ResultsApp() {
   const [city, setCity] = useState("London");
@@ -26,6 +39,7 @@ export function ResultsApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compareToast, setCompareToast] = useState<string | null>(null);
+  const unsupportedCity = city && !SUPPORTED_CITIES.some((item) => item.toLowerCase() === city.toLowerCase());
 
   const chips = useMemo(
     () => [
@@ -46,6 +60,11 @@ export function ResultsApp() {
     setLoading(true);
     setError(null);
     try {
+      if (unsupportedCity) {
+        setItems([]);
+        setTotal(0);
+        return;
+      }
       const data = await searchProperties({
         city,
         check_in: checkIn,
@@ -73,31 +92,45 @@ export function ResultsApp() {
   }
 
   async function applyNaturalLanguage() {
-    const response = await fetch(`${API_URL}/api/intent`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: nl, session_id: "demo" })
-    });
-    const intent = await response.json();
-    if (intent.city) setCity(intent.city);
-    if (intent.check_in) setCheckIn(intent.check_in);
-    if (intent.check_out) setCheckOut(intent.check_out);
-    if (intent.adults) setAdults(intent.adults);
-    if (intent.children !== undefined) setChildren(intent.children);
-    if (intent.rooms) setRooms(intent.rooms);
-    if (intent.budget_per_night) setMaxPrice(String(intent.budget_per_night));
-    if (intent.hard_constraints?.room_type) setRoomType(intent.hard_constraints.room_type);
-    if (intent.soft_preferences?.balcony && !amenities.includes("balcony")) {
-      setAmenities((current) => Array.from(new Set([...current, "balcony"])));
-    }
-    if (intent.hard_constraints?.near_transit !== undefined) {
-      setNearTransit(Boolean(intent.hard_constraints.near_transit));
+    setLoading(true);
+    setError(null);
+    setItems([]);
+    setTotal(0);
+    try {
+      const response = await fetch(`${API_URL}/api/intent`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: nl, session_id: "demo" })
+      });
+      if (!response.ok) throw new Error("Natural language parse failed");
+      const intent = await response.json();
+      const nextCity = intent.city ?? inferCity(nl);
+      if (nextCity) setCity(nextCity);
+      if (nextCity && !SUPPORTED_CITIES.some((item) => item.toLowerCase() === nextCity.toLowerCase())) {
+        setLoading(false);
+      }
+      if (intent.check_in) setCheckIn(intent.check_in);
+      if (intent.check_out) setCheckOut(intent.check_out);
+      if (intent.adults) setAdults(intent.adults);
+      if (intent.children !== undefined) setChildren(intent.children);
+      if (intent.rooms) setRooms(intent.rooms);
+      if (intent.budget_per_night) setMaxPrice(String(intent.budget_per_night));
+      if (intent.hard_constraints?.room_type) setRoomType(intent.hard_constraints.room_type);
+      if (intent.soft_preferences?.balcony && !amenities.includes("balcony")) {
+        setAmenities((current) => Array.from(new Set([...current, "balcony"])));
+      }
+      if (intent.hard_constraints?.near_transit !== undefined) {
+        setNearTransit(Boolean(intent.hard_constraints.near_transit));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Natural language parse failed");
+      setLoading(false);
     }
   }
 
   useEffect(() => {
     runSearch().catch(() => setItems([]));
-  }, [adults, amenities, checkIn, checkOut, children, city, maxPrice, minRating, nearTransit, roomType, rooms, sort]);
+  }, [adults, amenities, checkIn, checkOut, children, city, maxPrice, minRating, nearTransit, roomType, rooms, sort, unsupportedCity]);
 
   function toggleAmenity(amenity: string) {
     setAmenities((current) =>
@@ -129,7 +162,14 @@ export function ResultsApp() {
           <div>
             <label className="text-xs font-bold uppercase text-black/50">Natural language search</label>
             <div className="mt-2 flex gap-2">
-              <input className="w-full rounded-full border border-black/10 bg-white/80 px-4 py-3 shadow-inner outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/10" value={nl} onChange={(event) => setNl(event.target.value)} />
+              <input
+                className="w-full rounded-full border border-black/10 bg-white/80 px-4 py-3 shadow-inner outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/10"
+                value={nl}
+                onChange={(event) => setNl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") applyNaturalLanguage();
+                }}
+              />
               <button className="button" onClick={applyNaturalLanguage}>Apply</button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">{chips.map((chip) => <span className="chip" key={chip}>{chip}</span>)}</div>
@@ -162,6 +202,14 @@ export function ResultsApp() {
             </div>
           </div>
         </div>
+        {unsupportedCity ? (
+          <div className="card mb-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="font-black">Inventory not available for {city}</div>
+            <p className="mt-1 text-amber-900/75">
+              The intent was parsed, but this demo inventory currently covers London and Lisbon only. Try one of those cities, or use the concierge to see a graceful no-inventory explanation.
+            </p>
+          </div>
+        ) : null}
 
         <div className="mb-4 flex items-center justify-between">
           <div>
